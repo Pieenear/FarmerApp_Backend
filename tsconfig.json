@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "rootDir": "./src",
+    "outDir": "dist",
+    "module": "node16",
+    "moduleResolution": "node16",
+    "target": "ES2023",
+    "strict": true,
+    "esModuleInterop": true,
+    "ignoreDeprecations": "5.0",
+    "allowJs": true ,
+    "typeRoots": ["./src/@types", "./node_modules/@types"]
+  },
+  "include": ["src"]
+}
