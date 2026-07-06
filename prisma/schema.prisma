@@ -11,3 +11,671 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+
+enum Role {
+  farmer
+  admin
+}
+
+enum RequestType {
+  soil_testing
+  water_testing
+  labour_management
+  farming_equipment
+  fertilizer_management
+  pesticide_management
+  storage_request
+  group_forming
+  crop_selling
+}
+
+enum RequestStatus {
+  pending
+  accepted
+  rejected
+  assigned
+  in_progress
+  completed
+  cancelled
+}
+
+enum AttachmentType {
+  image
+  pdf
+  other
+}
+
+enum StaffSpecialization {
+  soil
+  water
+  labour
+  equipment
+  fertilizer
+  pesticide
+  storage
+  general
+}
+
+enum AvailabilityStatus {
+  available
+  busy
+  off_duty
+}
+
+enum GroupRole {
+  member
+  leader
+}
+
+enum GroupStatus {
+  active
+  inactive
+}
+
+enum StorageAllocationStatus {
+  reserved
+  active
+  vacated
+}
+
+enum ListingStatus {
+  open
+  matched
+  sold
+  cancelled
+}
+
+enum MatchStatus {
+  proposed
+  accepted
+  rejected
+  completed
+}
+
+enum ReportType {
+  soil
+  water
+}
+
+enum Severity {
+  low
+  medium
+  high
+  critical
+}
+
+enum DayOfWeek {
+  Mon
+  Tue
+  Wed
+  Thu
+  Fri
+  Sat
+  Sun
+}
+
+enum ContentCategory {
+  news
+  prevention_tip
+  farming_tip
+}
+
+enum ContentStatus {
+  draft
+  published
+  archived
+}
+
+model Area {
+  id       BigInt  @id @default(autoincrement())
+  name     String  @db.VarChar(150)
+  taluka   String? @db.VarChar(150)
+  district String? @db.VarChar(150)
+  state    String? @db.VarChar(150)
+  pincode  String? @db.VarChar(10)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  users                 User[]
+  serviceRequests       ServiceRequest[]
+  groundStaff           GroundStaff[]
+  buyers                Buyer[]
+  farmerGroups          FarmerGroup[]
+  storageUnits          StorageUnit[]
+  weatherAlerts         WeatherAlert[]
+  irrigationRecommendations IrrigationRecommendation[]
+  lightSchedules        LightSchedule[]
+  mcbContacts           McbContact[]
+  agriContent           AgriContent[]
+
+  @@map("areas")
+}
+
+model User {
+  id                 BigInt    @id @default(autoincrement())
+  name               String    @db.VarChar(150)
+  phone              String    @unique @db.VarChar(15)
+  email              String?   @unique @db.VarChar(150)
+  passwordHash       String?   @map("password_hash") @db.VarChar(255)
+  role               Role
+  areaId             BigInt?   @map("area_id")
+  profileImage       String?   @map("profile_image") @db.VarChar(255)
+  isActive           Boolean   @default(true) @map("is_active")
+  isVerified         Boolean   @default(false) @map("is_verified") // farmer verified by admin
+  verifiedByAdminId  BigInt?   @map("verified_by_admin_id")
+  verifiedAt         DateTime? @map("verified_at")
+  languagePref       String    @default("en") @map("language_pref") @db.VarChar(20)
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  area               Area?     @relation(fields: [areaId], references: [id])
+  verifiedByAdmin    User?     @relation("UserVerifiedBy", fields: [verifiedByAdminId], references: [id])
+  verifiedUsers      User[]    @relation("UserVerifiedBy")
+
+  farmerProfile      FarmerProfile?
+
+  // Requests raised by this user (as farmer)
+  serviceRequests        ServiceRequest[] @relation("FarmerRequests")
+  requestsAssignedByMe   ServiceRequest[] @relation("RequestAssignedByAdmin")
+  requestStatusLogs      RequestStatusLog[] @relation("StatusChangedBy")
+
+  groundStaffCreated     GroundStaff[]     @relation("GroundStaffCreatedByAdmin")
+  buyersCreated          Buyer[]           @relation("BuyerCreatedByAdmin")
+
+  groupMemberships       GroupMember[]
+  farmerGroupsCreated    FarmerGroup[]     @relation("GroupCreatedByAdmin")
+
+  storageAllocationsAsFarmer StorageAllocation[] @relation("StorageAllocationFarmer")
+  storageAllocationsByAdmin  StorageAllocation[] @relation("StorageAllocationByAdmin")
+
+  cropListings           CropListing[]     @relation("CropListingFarmer")
+  buyerMatchesByAdmin     BuyerMatch[]      @relation("BuyerMatchByAdmin")
+
+  labReportsUploaded      LabReport[]       @relation("LabReportUploadedByAdmin")
+
+  diseaseDetectionLogs    DiseaseDetectionLog[]
+  irrigationRecommendations IrrigationRecommendation[]
+
+  lightSchedulesUploaded  LightSchedule[]   @relation("LightScheduleUploadedByAdmin")
+  agriContentPublished    AgriContent[]     @relation("AgriContentPublishedByAdmin")
+
+  notifications           Notification[]
+
+  @@map("users")
+}
+
+// Extra farmer-specific info
+model FarmerProfile {
+  id            BigInt  @id @default(autoincrement())
+  userId        BigInt  @unique @map("user_id")
+  farmSizeAcres Decimal? @map("farm_size_acres") @db.Decimal(8, 2)
+  landLocation  String? @map("land_location") @db.VarChar(255)
+  primaryCrops  String? @map("primary_crops") @db.VarChar(255)
+  landSurveyNo  String? @map("land_survey_no") @db.VarChar(100)
+
+  user          User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("farmer_profiles")
+}
+
+// Ground staff — admin-managed records (no login/app access)
+model GroundStaff {
+  id                  BigInt   @id @default(autoincrement())
+  name                String   @db.VarChar(150)
+  phone               String?  @db.VarChar(15)
+  areaId              BigInt?  @map("area_id")
+  specialization      StaffSpecialization?
+  availabilityStatus  AvailabilityStatus @default(available) @map("availability_status")
+  isActive            Boolean  @default(true) @map("is_active")
+  createdByAdminId    BigInt?  @map("created_by_admin_id")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  area                Area?    @relation(fields: [areaId], references: [id])
+  createdByAdmin      User?    @relation("GroundStaffCreatedByAdmin", fields: [createdByAdminId], references: [id])
+  assignedRequests    ServiceRequest[] @relation("RequestAssignedToStaff")
+
+  @@map("ground_staff")
+}
+
+// Buyers — admin-managed records (no login/app access)
+model Buyer {
+  id                BigInt   @id @default(autoincrement())
+  name              String   @db.VarChar(150)
+  phone             String?  @db.VarChar(15)
+  companyName       String?  @map("company_name") @db.VarChar(200)
+  gstNo             String?  @map("gst_no") @db.VarChar(30)
+  preferredCrops    String?  @map("preferred_crops") @db.VarChar(255)
+  areaId            BigInt?  @map("area_id")
+  isActive          Boolean  @default(true) @map("is_active")
+  createdByAdminId  BigInt?  @map("created_by_admin_id")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  area              Area?    @relation(fields: [areaId], references: [id])
+  createdByAdmin    User?    @relation("BuyerCreatedByAdmin", fields: [createdByAdminId], references: [id])
+  buyerMatches      BuyerMatch[]
+
+  @@map("buyers")
+}
+
+
+model ServiceRequest {
+  id                     BigInt        @id @default(autoincrement())
+  farmerId               BigInt        @map("farmer_id")
+  requestType            RequestType   @map("request_type")
+  areaId                 BigInt?       @map("area_id")
+  description            String?       @db.Text
+  status                 RequestStatus @default(pending)
+  assignedStaffId        BigInt?       @map("assigned_staff_id")
+  assignedByAdminId      BigInt?       @map("assigned_by_admin_id")
+  scheduledDate          DateTime?     @map("scheduled_date") @db.Date
+  completedAt            DateTime?     @map("completed_at")
+  createdAt              DateTime      @default(now()) @map("created_at")
+  updatedAt              DateTime      @updatedAt @map("updated_at")
+
+  farmer                 User          @relation("FarmerRequests", fields: [farmerId], references: [id])
+  area                   Area?         @relation(fields: [areaId], references: [id])
+  assignedStaff          GroundStaff?  @relation("RequestAssignedToStaff", fields: [assignedStaffId], references: [id])
+  assignedByAdmin        User?         @relation("RequestAssignedByAdmin", fields: [assignedByAdminId], references: [id])
+
+  attachments            RequestAttachment[]
+  statusLogs             RequestStatusLog[]
+
+  soilTestDetail         SoilTestDetail?
+  waterTestDetail        WaterTestDetail?
+  labourRequestDetail    LabourRequestDetail?
+  equipmentRequestDetail EquipmentRequestDetail?
+  fertilizerRequestDetail FertilizerRequestDetail?
+  pesticideRequestDetail PesticideRequestDetail?
+  storageRequestDetail   StorageRequestDetail?
+  groupFormingRequestDetail GroupFormingRequestDetail?
+  cropSellingRequestDetail CropSellingRequestDetail?
+
+  storageAllocations     StorageAllocation[]
+  cropListings           CropListing[]
+  labReports             LabReport[]
+
+  @@map("service_requests")
+}
+
+model RequestAttachment {
+  id          BigInt         @id @default(autoincrement())
+  requestId   BigInt         @map("request_id")
+  fileUrl     String         @map("file_url") @db.VarChar(255)
+  fileType    AttachmentType @default(image) @map("file_type")
+  uploadedAt  DateTime       @default(now()) @map("uploaded_at")
+
+  request     ServiceRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@map("request_attachments")
+}
+
+// Accept/reject/assign/complete audit trail — every admin action is logged
+model RequestStatusLog {
+  id               BigInt         @id @default(autoincrement())
+  requestId        BigInt         @map("request_id")
+  changedByUserId  BigInt?        @map("changed_by_user_id")
+  previousStatus   String?        @map("previous_status") @db.VarChar(30)
+  newStatus        String?        @map("new_status") @db.VarChar(30)
+  remarks          String?        @db.Text
+  createdAt        DateTime       @default(now()) @map("created_at")
+
+  request          ServiceRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  changedByUser    User?          @relation("StatusChangedBy", fields: [changedByUserId], references: [id])
+
+  @@map("request_status_logs")
+}
+
+// ---- Type-specific detail tables (1:1 with ServiceRequest) ----
+
+model SoilTestDetail {
+  requestId       BigInt         @id @map("request_id")
+  sampleLocation  String?        @map("sample_location") @db.VarChar(255)
+  landAreaAcres   Decimal?       @map("land_area_acres") @db.Decimal(8, 2)
+  previousCrop    String?        @map("previous_crop") @db.VarChar(150)
+
+  request         ServiceRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@map("soil_test_details")
+}
+
+model WaterTestDetail {
+  requestId      BigInt         @id @map("request_id")
+  waterSource    String?        @map("water_source") @db.VarChar(50) // borewell/canal/river/pond/other
+  sampleLocation String?        @map("sample_location") @db.VarChar(255)
+
+  request        ServiceRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@map("water_test_details")
+}
+
+model LabourRequestDetail {
+  requestId          BigInt         @id @map("request_id")
+  labourType          String?        @map("labour_type") @db.VarChar(100)
+  numLabourersNeeded  Int?           @map("num_labourers_needed")
+  workStartDate       DateTime?      @map("work_start_date") @db.Date
+  durationDays        Int?           @map("duration_days")
+
+  request             ServiceRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@map("labour_request_details")
+}
+
+model EquipmentRequestDetail {
+  requestId           BigInt         @id @map("request_id")
+  equipmentType       String?        @map("equipment_type") @db.VarChar(150)
+  quantity            Int?           @default(1)
+  rentalDurationDays  Int?           @map("rental_duration_days")
+  preferredDate       DateTime?      @map("preferred_date") @db.Date
+
+  request             ServiceRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@map("equipment_request_details")
+}
+
+model FertilizerRequestDetail {
+  requestId       BigInt         @id @map("request_id")
+  fertilizerType  String?        @map("fertilizer_type") @db.VarChar(150)
+  quantityKg      Decimal?       @map("quantity_kg") @db.Decimal(10, 2)
+  cropType        String?        @map("crop_type") @db.VarChar(150)
+
+  request         ServiceRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@map("fertilizer_request_details")
+}
+
+model PesticideRequestDetail {
+  requestId             BigInt         @id @map("request_id")
+  pesticideType         String?        @map("pesticide_type") @db.VarChar(150)
+  quantityNeeded        Decimal?       @map("quantity_needed") @db.Decimal(10, 2)
+  pestIssueDescription  String?        @map("pest_issue_description") @db.Text
+
+  request               ServiceRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@map("pesticide_request_details")
+}
+
+model StorageRequestDetail {
+  requestId             BigInt         @id @map("request_id")
+  cropType              String?        @map("crop_type") @db.VarChar(150)
+  quantityKg            Decimal?       @map("quantity_kg") @db.Decimal(10, 2)
+  storageDurationDays   Int?           @map("storage_duration_days")
+  preferredStartDate    DateTime?      @map("preferred_start_date") @db.Date
+
+  request               ServiceRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@map("storage_request_details")
+}
+
+model GroupFormingRequestDetail {
+  requestId   BigInt         @id @map("request_id")
+  purpose     String?        @db.VarChar(255)
+  cropType    String?        @map("crop_type") @db.VarChar(150)
+  minMembers  Int?           @map("min_members")
+
+  request     ServiceRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@map("group_forming_request_details")
+}
+
+model CropSellingRequestDetail {
+  requestId     BigInt         @id @map("request_id")
+  cropType      String?        @map("crop_type") @db.VarChar(150)
+  quantityKg    Decimal?       @map("quantity_kg") @db.Decimal(10, 2)
+  expectedPrice Decimal?       @map("expected_price") @db.Decimal(10, 2)
+  harvestDate   DateTime?      @map("harvest_date") @db.Date
+
+  request       ServiceRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@map("crop_selling_request_details")
+}
+
+// =====================================================================
+// FARMER GROUPS
+// =====================================================================
+
+model FarmerGroup {
+  id                BigInt      @id @default(autoincrement())
+  name              String      @db.VarChar(200)
+  purpose           String?     @db.VarChar(255)
+  cropType          String?     @map("crop_type") @db.VarChar(150)
+  areaId            BigInt?     @map("area_id")
+  createdByAdminId  BigInt?     @map("created_by_admin_id")
+  status            GroupStatus @default(active)
+  createdAt         DateTime    @default(now()) @map("created_at")
+
+  area              Area?       @relation(fields: [areaId], references: [id])
+  createdByAdmin    User?       @relation("GroupCreatedByAdmin", fields: [createdByAdminId], references: [id])
+  members           GroupMember[]
+
+  @@map("farmer_groups")
+}
+
+model GroupMember {
+  id        BigInt      @id @default(autoincrement())
+  groupId   BigInt      @map("group_id")
+  farmerId  BigInt      @map("farmer_id")
+  role      GroupRole   @default(member)
+  joinedAt  DateTime    @default(now()) @map("joined_at")
+
+  group     FarmerGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  farmer    User        @relation(fields: [farmerId], references: [id])
+
+  @@unique([groupId, farmerId])
+  @@map("group_members")
+}
+
+// STORAGE ALLOCATION
+model StorageUnit {
+  id                   BigInt   @id @default(autoincrement())
+  name                 String?  @db.VarChar(200)
+  location             String?  @db.VarChar(255)
+  areaId               BigInt?  @map("area_id")
+  totalCapacityKg      Decimal? @map("total_capacity_kg") @db.Decimal(12, 2)
+  availableCapacityKg  Decimal? @map("available_capacity_kg") @db.Decimal(12, 2)
+
+  area                 Area?    @relation(fields: [areaId], references: [id])
+  allocations          StorageAllocation[]
+
+  @@map("storage_units")
+}
+
+model StorageAllocation {
+  id                    BigInt                   @id @default(autoincrement())
+  storageUnitId         BigInt                   @map("storage_unit_id")
+  requestId             BigInt                   @map("request_id")
+  farmerId              BigInt                   @map("farmer_id")
+  allocatedCapacityKg   Decimal?                 @map("allocated_capacity_kg") @db.Decimal(12, 2)
+  startDate             DateTime?                @map("start_date") @db.Date
+  endDate               DateTime?                @map("end_date") @db.Date
+  status                StorageAllocationStatus  @default(reserved)
+  allocatedByAdminId    BigInt?                  @map("allocated_by_admin_id")
+
+  storageUnit           StorageUnit              @relation(fields: [storageUnitId], references: [id])
+  request               ServiceRequest           @relation(fields: [requestId], references: [id])
+  farmer                User                     @relation("StorageAllocationFarmer", fields: [farmerId], references: [id])
+  allocatedByAdmin      User?                    @relation("StorageAllocationByAdmin", fields: [allocatedByAdminId], references: [id])
+
+  @@map("storage_allocations")
+}
+
+// CROP SELLING / BUYER MATCHING
+model CropListing {
+  id            BigInt         @id @default(autoincrement())
+  farmerId      BigInt         @map("farmer_id")
+  requestId     BigInt         @map("request_id")
+  cropType      String?        @map("crop_type") @db.VarChar(150)
+  quantityKg    Decimal?       @map("quantity_kg") @db.Decimal(10, 2)
+  askingPrice   Decimal?       @map("asking_price") @db.Decimal(10, 2)
+  status        ListingStatus  @default(open)
+  createdAt     DateTime       @default(now()) @map("created_at")
+
+  farmer        User           @relation("CropListingFarmer", fields: [farmerId], references: [id])
+  request       ServiceRequest @relation(fields: [requestId], references: [id])
+  buyerMatches  BuyerMatch[]
+
+  @@map("crop_listings")
+}
+
+model BuyerMatch {
+  id                BigInt      @id @default(autoincrement())
+  cropListingId     BigInt      @map("crop_listing_id")
+  buyerId           BigInt      @map("buyer_id")
+  matchedByAdminId  BigInt?     @map("matched_by_admin_id")
+  offeredPrice      Decimal?    @map("offered_price") @db.Decimal(10, 2)
+  status            MatchStatus @default(proposed)
+  matchedAt         DateTime    @default(now()) @map("matched_at")
+
+  cropListing       CropListing @relation(fields: [cropListingId], references: [id])
+  buyer             Buyer       @relation(fields: [buyerId], references: [id])
+  matchedByAdmin    User?       @relation("BuyerMatchByAdmin", fields: [matchedByAdminId], references: [id])
+
+  @@map("buyer_matches")
+}
+
+// LAB REPORTS (SOIL / WATER) — RAW + SIMPLIFIED
+model LabReport {
+  id                  BigInt         @id @default(autoincrement())
+  requestId           BigInt         @map("request_id")
+  reportType          ReportType     @map("report_type")
+  rawFileUrl          String         @map("raw_file_url") @db.VarChar(255)
+  uploadedByAdminId   BigInt?        @map("uploaded_by_admin_id")
+  uploadedAt          DateTime       @default(now()) @map("uploaded_at")
+
+  request             ServiceRequest @relation(fields: [requestId], references: [id])
+  uploadedByAdmin     User?          @relation("LabReportUploadedByAdmin", fields: [uploadedByAdminId], references: [id])
+  simplifiedReport    SimplifiedReport?
+
+  @@map("lab_reports")
+}
+
+model SimplifiedReport {
+  id              BigInt    @id @default(autoincrement())
+  labReportId     BigInt    @unique @map("lab_report_id")
+  summaryText     String?   @map("summary_text") @db.Text
+  healthScore     Decimal?  @map("health_score") @db.Decimal(5, 2)
+  keyParameters   Json?     @map("key_parameters")
+  recommendations String?   @db.Text
+  language        String    @default("en") @db.VarChar(20)
+  generatedAt     DateTime  @default(now()) @map("generated_at")
+
+  labReport       LabReport @relation(fields: [labReportId], references: [id], onDelete: Cascade)
+
+  @@map("simplified_reports")
+}
+
+
+// AUTO / API-DRIVEN FEATURES (VIEW & GET)
+model DiseaseDetectionLog {
+  id                BigInt   @id @default(autoincrement())
+  farmerId          BigInt   @map("farmer_id")
+  imageUrl          String   @map("image_url") @db.VarChar(255)
+  detectedDisease   String?  @map("detected_disease") @db.VarChar(200)
+  confidenceScore   Decimal? @map("confidence_score") @db.Decimal(5, 2)
+  recommendation    String?  @db.Text
+  cropType          String?  @map("crop_type") @db.VarChar(150)
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  farmer            User     @relation(fields: [farmerId], references: [id])
+
+  @@map("disease_detection_logs")
+}
+
+model WeatherAlert {
+  id          BigInt    @id @default(autoincrement())
+  areaId      BigInt    @map("area_id")
+  alertType   String?   @map("alert_type") @db.VarChar(100)
+  message     String?   @db.Text
+  severity    Severity  @default(medium)
+  validFrom   DateTime? @map("valid_from")
+  validTo     DateTime? @map("valid_to")
+  source      String?   @db.VarChar(100)
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  area        Area      @relation(fields: [areaId], references: [id])
+
+  @@map("weather_alerts")
+}
+
+model IrrigationRecommendation {
+  id                  BigInt    @id @default(autoincrement())
+  farmerId            BigInt    @map("farmer_id")
+  areaId              BigInt?   @map("area_id")
+  cropType            String?   @map("crop_type") @db.VarChar(150)
+  recommendationText  String?   @map("recommendation_text") @db.Text
+  waterAmountLiters   Decimal?  @map("water_amount_liters") @db.Decimal(10, 2)
+  recommendedDate     DateTime? @map("recommended_date") @db.Date
+  generatedAt         DateTime  @default(now()) @map("generated_at")
+
+  farmer              User      @relation(fields: [farmerId], references: [id])
+  area                Area?     @relation(fields: [areaId], references: [id])
+
+  @@map("irrigation_recommendations")
+}
+
+
+// AREA-WISE STATIC INFO
+model LightSchedule {
+  id                  BigInt    @id @default(autoincrement())
+  areaId              BigInt    @map("area_id")
+  dayOfWeek           DayOfWeek @map("day_of_week")
+  startTime           DateTime  @map("start_time") @db.Time
+  endTime             DateTime  @map("end_time") @db.Time
+  uploadedByAdminId   BigInt?   @map("uploaded_by_admin_id")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  area                Area      @relation(fields: [areaId], references: [id])
+  uploadedByAdmin     User?     @relation("LightScheduleUploadedByAdmin", fields: [uploadedByAdminId], references: [id])
+
+  @@map("light_schedules")
+}
+
+model McbContact {
+  id            BigInt   @id @default(autoincrement())
+  areaId        BigInt   @map("area_id")
+  contactName   String?  @map("contact_name") @db.VarChar(150)
+  designation   String?  @db.VarChar(100)
+  phoneNumber   String?  @map("phone_number") @db.VarChar(15)
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  area          Area     @relation(fields: [areaId], references: [id])
+
+  @@map("mcb_contacts")
+}
+
+// CONTENT MANAGEMENT (Agri News / Tips) 
+
+model AgriContent {
+  id                  BigInt          @id @default(autoincrement())
+  title               String          @db.VarChar(255)
+  content             String          @db.Text
+  category            ContentCategory
+  imageUrl            String?         @map("image_url") @db.VarChar(255)
+  areaId              BigInt?         @map("area_id") // null = applies to all areas
+  publishedByAdminId  BigInt?         @map("published_by_admin_id")
+  status              ContentStatus   @default(draft)
+  publishedAt         DateTime?       @map("published_at")
+  createdAt           DateTime        @default(now()) @map("created_at")
+
+  area                Area?           @relation(fields: [areaId], references: [id])
+  publishedByAdmin    User?           @relation("AgriContentPublishedByAdmin", fields: [publishedByAdminId], references: [id])
+
+  @@map("agri_content")
+}
+
+// NOTIFICATIONS
+model Notification {
+  id           BigInt   @id @default(autoincrement())
+  userId       BigInt   @map("user_id")
+  title        String?  @db.VarChar(200)
+  message      String?  @db.Text
+  type         String?  @db.VarChar(50) // request_update, weather_alert, news...
+  referenceId  BigInt?  @map("reference_id")
+  isRead       Boolean  @default(false) @map("is_read")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  user         User     @relation(fields: [userId], references: [id])
+
+  @@map("notifications")
+}
