@@ -1,5 +1,5 @@
 import { prisma } from "../../lib/prisma.js";
-import { RequestType, RequestStatus, Role } from "../../generated/prisma/client.js";
+import { RequestType, RequestStatus, Role, AvailabilityStatus } from "../../generated/prisma/client.js";
 const detailCreateMap = {
     [RequestType.soil_testing]: "soilTestDetail",
     [RequestType.water_testing]: "waterTestDetail",
@@ -98,9 +98,7 @@ export const getFarmerRequestsService = async (farmerId, filters) => {
         orderBy: { createdAt: "desc" },
     });
 };
-/**
- * Service to fetch requests for admin panel (with status / type / area filters)
- */
+//Service to fetch requests for admin panel (with status / type / area filters)
 export const getAdminRequestsService = async (filters) => {
     return await prisma.serviceRequest.findMany({
         where: {
@@ -112,9 +110,7 @@ export const getAdminRequestsService = async (filters) => {
         orderBy: { createdAt: "desc" },
     });
 };
-/**
- * Service to get a request by ID, verifying ownership if the requester is a farmer
- */
+// Service to get a request by ID, verifying ownership if the requester is a farmer
 export const getRequestByIdService = async (id, userId, userRole) => {
     const request = await prisma.serviceRequest.findUnique({
         where: { id },
@@ -143,9 +139,7 @@ export const getRequestByIdService = async (id, userId, userRole) => {
     }
     return request;
 };
-/**
- * Service to update request status (Admin function)
- */
+// Service to update request status (Admin function)
 export const updateRequestStatusService = async (requestId, adminId, data) => {
     const { status, remarks, scheduledDate } = data;
     const request = await prisma.serviceRequest.findUnique({
@@ -201,6 +195,18 @@ export const updateRequestStatusService = async (requestId, adminId, data) => {
                     });
                 }
             }
+        }
+        // Side Effect: Release ground staff if request is marked completed, cancelled, or rejected
+        if ((status === RequestStatus.completed ||
+            status === RequestStatus.cancelled ||
+            status === RequestStatus.rejected) &&
+            request.assignedStaffId) {
+            await tx.groundStaff.update({
+                where: { id: request.assignedStaffId },
+                data: {
+                    availabilityStatus: AvailabilityStatus.available,
+                },
+            });
         }
         return updatedRequest;
     }, {

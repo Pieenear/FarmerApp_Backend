@@ -4,6 +4,7 @@ import { connectDB } from "./lib/prisma.js";
 import authRoutes from "./module/auth/auth.router.js";
 import areaRoutes from "./module/areas/area.router.js";
 import requestRoutes from "./module/requests/request.router.js";
+import staffRoutes from "./module/staff/staff.router.js";
 // Global BigInt serialization patch for Express/JSON
 BigInt.prototype.toJSON = function () {
     const num = Number(this);
@@ -22,6 +23,7 @@ app.use((req, res, next) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/areas", areaRoutes);
 app.use("/api/requests", requestRoutes);
+app.use("/api/staff", staffRoutes);
 // Base route / Health check
 app.get("/health", (req, res) => {
     res.json({ status: "ok", message: "Farmer App API is running smoothly." });

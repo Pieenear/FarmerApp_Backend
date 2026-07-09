@@ -1,9 +1,7 @@
 import { raiseRequestService, getFarmerRequestsService, getAdminRequestsService, getRequestByIdService, updateRequestStatusService, } from "./request.service.js";
 import { Role } from "../../generated/prisma/client.js";
 import { prisma } from "../../lib/prisma.js";
-/**
- * Helper to fetch database user role
- */
+// Helper to fetch database user role
 const getUserRole = async (userId) => {
     const user = await prisma.user.findUnique({
         where: { id: BigInt(userId) },
@@ -11,11 +9,6 @@ const getUserRole = async (userId) => {
     });
     return user ? user.role : null;
 };
-/**
- * @route   POST /api/requests
- * @desc    Raise a new service request (Farmer only)
- * @access  Private (Farmer)
- */
 export const raiseRequest = async (req, res) => {
     try {
         if (!req.user) {
@@ -33,11 +26,6 @@ export const raiseRequest = async (req, res) => {
         res.status(400).json({ error: error.message || "Failed to raise request." });
     }
 };
-/**
- * @route   GET /api/requests
- * @desc    Get service requests (Farmers get their own, Admins get filtered list of all)
- * @access  Private (Farmer / Admin)
- */
 export const getRequests = async (req, res) => {
     try {
         if (!req.user) {
@@ -67,11 +55,6 @@ export const getRequests = async (req, res) => {
         res.status(500).json({ error: "Failed to retrieve requests." });
     }
 };
-/**
- * @route   GET /api/requests/:id
- * @desc    Get request by ID (Farmers can access only their own requests)
- * @access  Private (Farmer / Admin)
- */
 export const getRequestById = async (req, res) => {
     try {
         const { id } = req.params;
@@ -97,11 +80,6 @@ export const getRequestById = async (req, res) => {
         res.status(status).json({ error: error.message || "Request not found." });
     }
 };
-/**
- * @route   PATCH /api/requests/:id/status
- * @desc    Update service request status (Admin only)
- * @access  Private (Admin)
- */
 export const updateRequestStatus = async (req, res) => {
     try {
         const { id } = req.params;

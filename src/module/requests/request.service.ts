@@ -1,5 +1,5 @@
 import { prisma } from "../../lib/prisma.js";
-import { RequestType, RequestStatus, Role } from "../../generated/prisma/client.js";
+import { RequestType, RequestStatus, Role, AvailabilityStatus } from "../../generated/prisma/client.js";
 import { RaiseRequestInput, UpdateRequestStatusInput } from "./request.schema.js";
 
 const detailCreateMap: Record<RequestType, string> = {
@@ -233,6 +233,21 @@ export const updateRequestStatusService = async (
           });
         }
       }
+    }
+
+    // Side Effect: Release ground staff if request is marked completed, cancelled, or rejected
+    if (
+      (status === RequestStatus.completed ||
+        status === RequestStatus.cancelled ||
+        status === RequestStatus.rejected) &&
+      request.assignedStaffId
+    ) {
+      await tx.groundStaff.update({
+        where: { id: request.assignedStaffId },
+        data: {
+          availabilityStatus: AvailabilityStatus.available,
+        },
+      });
     }
 
     return updatedRequest;
