@@ -1,8 +1,10 @@
 import "dotenv/config.js";
 import express from "express";
 import { connectDB } from "./lib/prisma.js";
-import authRoutes from "./features/auth/auth.router.js";
-import areaRoutes from "./features/areas/area.router.js";
+import authRoutes from "./module/auth/auth.router.js";
+import areaRoutes from "./module/areas/area.router.js";
+import requestRoutes from "./module/requests/request.router.js";
+
 
 
 // Global BigInt serialization patch for Express/JSON
@@ -26,6 +28,7 @@ app.use((req, res, next) => {
 // Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/areas", areaRoutes);
+app.use("/api/requests", requestRoutes);
 
 // Base route / Health check
 app.get("/health", (req, res) => {

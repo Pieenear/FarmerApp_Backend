@@ -82,6 +82,8 @@ export const signupFarmerService = async (data: FarmerSignupInput) => {
     });
 
     return { user, farmerProfile };
+  }, {
+    timeout: 20000
   });
 
   const token = generateToken(result.user.id);
