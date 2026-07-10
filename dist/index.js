@@ -6,6 +6,7 @@ import areaRoutes from "./module/areas/area.router.js";
 import requestRoutes from "./module/requests/request.router.js";
 import staffRoutes from "./module/staff/staff.router.js";
 import reportRoutes from "./module/reports/report.router.js";
+import marketplaceRoutes from "./module/marketplace/marketplace.router.js";
 // Global BigInt serialization patch for Express/JSON
 BigInt.prototype.toJSON = function () {
     const num = Number(this);
@@ -26,6 +27,7 @@ app.use("/api/areas", areaRoutes);
 app.use("/api/requests", requestRoutes);
 app.use("/api/staff", staffRoutes);
 app.use("/api/reports", reportRoutes);
+app.use("/api/marketplace", marketplaceRoutes);
 // Base route / Health check
 app.get("/health", (req, res) => {
     res.json({ status: "ok", message: "Farmer App API is running smoothly." });
