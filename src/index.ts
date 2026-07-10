@@ -5,6 +5,8 @@ import authRoutes from "./module/auth/auth.router.js";
 import areaRoutes from "./module/areas/area.router.js";
 import requestRoutes from "./module/requests/request.router.js";
 import staffRoutes from "./module/staff/staff.router.js";
+import reportRoutes from "./module/reports/report.router.js";
+
 
 
 
@@ -32,6 +34,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/areas", areaRoutes);
 app.use("/api/requests", requestRoutes);
 app.use("/api/staff", staffRoutes);
+app.use("/api/reports", reportRoutes);
 
 // Base route / Health check
 app.get("/health", (req, res) => {
