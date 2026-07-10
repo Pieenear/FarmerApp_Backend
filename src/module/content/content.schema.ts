@@ -1,0 +1,16 @@
+import { z } from "zod";
+import { ContentCategory, ContentStatus } from "../../generated/prisma/client.js";
+
+export const createContentSchema = z.object({
+  title: z.string().min(1, "Title is required").max(255),
+  content: z.string().min(1, "Content is required"),
+  category: z.nativeEnum(ContentCategory),
+  imageUrl: z.string().max(255).optional(),
+  areaId: z.union([z.number().int(), z.string().regex(/^\d+$/).transform(v => Number(v))]).optional(),
+  status: z.nativeEnum(ContentStatus).optional().default(ContentStatus.draft),
+});
+
+export const updateContentSchema = createContentSchema.partial();
+
+export type CreateContentInput = z.infer<typeof createContentSchema>;
+export type UpdateContentInput = z.infer<typeof updateContentSchema>;
