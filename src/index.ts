@@ -4,6 +4,7 @@ import { connectDB } from "./lib/prisma.js";
 import authRoutes from "./module/auth/auth.router.js";
 import areaRoutes from "./module/areas/area.router.js";
 import requestRoutes from "./module/requests/request.router.js";
+import contentRouter from "./features/content/content.router.js";
 
 
 
@@ -29,6 +30,7 @@ app.use((req, res, next) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/areas", areaRoutes);
 app.use("/api/requests", requestRoutes);
+app.use("/api/content",contentRouter)
 
 // Base route / Health check
 app.get("/health", (req, res) => {
