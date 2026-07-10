@@ -8,6 +8,7 @@ import staffRoutes from "./module/staff/staff.router.js";
 import reportRoutes from "./module/reports/report.router.js";
 import marketplaceRoutes from "./module/marketplace/marketplace.router.js";
 import storageRoutes from "./module/storage/storage.router.js";
+import weatherRoutes from "./module/weather/weather.router.js";
 
 
 
@@ -39,6 +40,7 @@ app.use("/api/staff", staffRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/marketplace", marketplaceRoutes);
 app.use("/api/storage", storageRoutes);
+app.use("/api/weather", weatherRoutes);
 
 // Base route / Health check
 app.get("/health", (req, res) => {

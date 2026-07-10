@@ -1,0 +1,119 @@
+import { prisma } from "../../lib/prisma.js";
+import { Severity } from "../../generated/prisma/client.js";
+export const createWeatherAlertService = async (data) => {
+    const { areaId, alertType, message, severity, validFrom, validTo, source } = data;
+    const area = await prisma.area.findUnique({
+        where: { id: BigInt(areaId) },
+    });
+    if (!area) {
+        throw new Error("Area not found.");
+    }
+    const parsedValidFrom = validFrom ? new Date(validFrom) : new Date();
+    const parsedValidTo = validTo ? new Date(validTo) : null;
+    return await prisma.$transaction(async (tx) => {
+        // 1. Create WeatherAlert
+        const alert = await tx.weatherAlert.create({
+            data: {
+                areaId: BigInt(areaId),
+                alertType,
+                message,
+                severity: severity || Severity.medium,
+                validFrom: parsedValidFrom,
+                validTo: parsedValidTo,
+                source: source || null,
+            },
+            include: {
+                area: true,
+            },
+        });
+        // 2. Fetch all users registered in this Area
+        const users = await tx.user.findMany({
+            where: { areaId: BigInt(areaId), isActive: true },
+            select: { id: true },
+        });
+        // 3. Create Notifications in bulk for all target area users
+        if (users.length > 0) {
+            await tx.notification.createMany({
+                data: users.map((u) => ({
+                    userId: u.id,
+                    title: `[${(severity || Severity.medium).toUpperCase()}] Weather Alert: ${alertType}`,
+                    message,
+                    type: "weather_alert",
+                    referenceId: alert.id,
+                })),
+            });
+        }
+        return alert;
+    }, {
+        timeout: 20000
+    });
+};
+export const listWeatherAlertsService = async (filters) => {
+    const now = new Date();
+    const where = {
+        areaId: filters.areaId ? BigInt(filters.areaId) : undefined,
+        severity: filters.severity || undefined,
+    };
+    if (filters.activeOnly) {
+        where.AND = [
+            { OR: [{ validFrom: null }, { validFrom: { lte: now } }] },
+            { OR: [{ validTo: null }, { validTo: { gte: now } }] },
+        ];
+    }
+    return await prisma.weatherAlert.findMany({
+        where,
+        include: {
+            area: true,
+        },
+        orderBy: { createdAt: "desc" },
+    });
+};
+export const getWeatherAlertByIdService = async (id) => {
+    const alert = await prisma.weatherAlert.findUnique({
+        where: { id },
+        include: {
+            area: true,
+        },
+    });
+    if (!alert) {
+        throw new Error("Weather alert not found.");
+    }
+    return alert;
+};
+export const updateWeatherAlertService = async (id, data) => {
+    const { areaId, alertType, message, severity, validFrom, validTo, source } = data;
+    const existing = await prisma.weatherAlert.findUnique({ where: { id } });
+    if (!existing) {
+        throw new Error("Weather alert not found.");
+    }
+    if (areaId !== undefined) {
+        const area = await prisma.area.findUnique({ where: { id: BigInt(areaId) } });
+        if (!area) {
+            throw new Error("Target Area not found.");
+        }
+    }
+    return await prisma.weatherAlert.update({
+        where: { id },
+        data: {
+            areaId: areaId !== undefined ? BigInt(areaId) : undefined,
+            alertType: alertType !== undefined ? alertType : undefined,
+            message: message !== undefined ? message : undefined,
+            severity: severity !== undefined ? severity : undefined,
+            validFrom: validFrom !== undefined ? (validFrom ? new Date(validFrom) : null) : undefined,
+            validTo: validTo !== undefined ? (validTo ? new Date(validTo) : null) : undefined,
+            source: source !== undefined ? source || null : undefined,
+        },
+        include: {
+            area: true,
+        },
+    });
+};
+export const deleteWeatherAlertService = async (id) => {
+    const existing = await prisma.weatherAlert.findUnique({ where: { id } });
+    if (!existing) {
+        throw new Error("Weather alert not found.");
+    }
+    return await prisma.weatherAlert.delete({
+        where: { id },
+    });
+};
