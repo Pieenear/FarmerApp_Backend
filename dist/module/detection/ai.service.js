@@ -4,9 +4,13 @@ export const analyzeCropImage = async (imageUrl, cropType) => {
     if (geminiKey) {
         try {
             console.log("Calling Gemini API for crop disease detection...");
-            const imgRes = await fetch(imageUrl);
+            const imgRes = await fetch(imageUrl, {
+                headers: {
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+                }
+            });
             if (!imgRes.ok)
-                throw new Error("Failed to download crop image from URL.");
+                throw new Error(`Failed to download crop image. Status: ${imgRes.status}`);
             const buffer = await imgRes.arrayBuffer();
             const base64Image = Buffer.from(buffer).toString("base64");
             const mimeType = imgRes.headers.get("content-type") || "image/jpeg";
