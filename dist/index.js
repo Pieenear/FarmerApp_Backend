@@ -1,5 +1,6 @@
 import "dotenv/config.js";
 import express from "express";
+import cors from "cors";
 import { connectDB } from "./lib/prisma.js";
 import authRoutes from "./module/auth/auth.router.js";
 import areaRoutes from "./module/areas/area.router.js";
@@ -12,6 +13,8 @@ import weatherRoutes from "./module/weather/weather.router.js";
 import contentRoutes from "./module/content/content.router.js";
 import irrigationRoutes from "./module/irrigation/irrigation.router.js";
 import detectionRoutes from "./module/detection/detection.router.js";
+import notificationsRoutes from "./module/notifications/notifications.router.js";
+import groupsRoutes from "./module/groups/groups.router.js";
 // Global BigInt serialization patch for Express/JSON
 BigInt.prototype.toJSON = function () {
     const num = Number(this);
@@ -20,6 +23,11 @@ BigInt.prototype.toJSON = function () {
 const app = express();
 const PORT = process.env.PORT || 5000;
 // Middleware
+const frontendUrl = process.env.FRONTEND_URL;
+app.use(cors({
+    origin: frontendUrl ? frontendUrl.split(",").map(url => url.trim()) : "*",
+    credentials: true,
+}));
 app.use(express.json());
 // Request logger (basic)
 app.use((req, res, next) => {
@@ -38,6 +46,8 @@ app.use("/api/weather", weatherRoutes);
 app.use("/api/content", contentRoutes);
 app.use("/api/irrigation", irrigationRoutes);
 app.use("/api/detection", detectionRoutes);
+app.use("/api/notifications", notificationsRoutes);
+app.use("/api/groups", groupsRoutes);
 // Base route / Health check
 app.get("/health", (req, res) => {
     res.json({ status: "ok", message: "Farmer App API is running smoothly." });

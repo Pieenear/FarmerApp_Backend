@@ -10,6 +10,8 @@ import {
   getMcbContactByIdService,
   updateMcbContactService,
   deleteMcbContactService,
+  createRecommendationService,
+  listRecommendationsService,
 } from "./irrigation.service.js";
 import { prisma } from "../../lib/prisma.js";
 import { Role } from "../../generated/prisma/client.js";
@@ -213,5 +215,41 @@ export const deleteMcbContact = async (req: Request, res: Response): Promise<voi
   } catch (error: any) {
     console.error("Delete MCB contact error:", error);
     res.status(400).json({ error: error.message || "Failed to delete MCB contact." });
+  }
+};
+
+// ==========================================
+// 3. IRRIGATION RECOMMENDATION CONTROLLERS
+// ==========================================
+
+export const createRecommendation = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const recommendation = await createRecommendationService(req.body);
+    res.status(201).json({ message: "Irrigation recommendation created successfully.", recommendation });
+  } catch (error: any) {
+    console.error("Create irrigation recommendation error:", error);
+    res.status(400).json({ error: error.message || "Failed to create recommendation." });
+  }
+};
+
+export const listRecommendations = async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!req.user) {
+      res.status(401).json({ error: "Unauthorized." });
+      return;
+    }
+
+    const { farmerId } = req.query;
+
+    const recommendations = await listRecommendationsService({
+      role: req.user.role as Role,
+      requesterId: BigInt(req.user.id),
+      farmerId: farmerId ? BigInt(farmerId as string) : undefined,
+    });
+
+    res.status(200).json({ recommendations });
+  } catch (error: any) {
+    console.error("List recommendations error:", error);
+    res.status(500).json({ error: "Failed to retrieve recommendations." });
   }
 };

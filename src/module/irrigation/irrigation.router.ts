@@ -10,6 +10,8 @@ import {
   getMcbContactById,
   updateMcbContact,
   deleteMcbContact,
+  createRecommendation,
+  listRecommendations,
 } from "./irrigation.controller.js";
 import { authMiddleware, requireRole } from "../../middlewares/auth.middleware.js";
 import { validateRequest } from "../../middlewares/validation.middleware.js";
@@ -18,6 +20,7 @@ import {
   updateLightScheduleSchema,
   createMcbContactSchema,
   updateMcbContactSchema,
+  createRecommendationSchema,
 } from "./irrigation.schema.js";
 import { Role } from "../../generated/prisma/client.js";
 
@@ -97,6 +100,23 @@ router.delete(
   authMiddleware,
   requireRole([Role.admin]),
   deleteMcbContact
+);
+
+// ==========================================
+// 3. IRRIGATION RECOMMENDATION ROUTES
+// ==========================================
+router.post(
+  "/recommendations",
+  authMiddleware,
+  requireRole([Role.admin]),
+  validateRequest(createRecommendationSchema),
+  createRecommendation
+);
+
+router.get(
+  "/recommendations",
+  authMiddleware,
+  listRecommendations
 );
 
 export default router;

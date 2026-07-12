@@ -1,4 +1,4 @@
-import { createLightScheduleService, listLightSchedulesService, getLightScheduleByIdService, updateLightScheduleService, deleteLightScheduleService, createMcbContactService, listMcbContactsService, getMcbContactByIdService, updateMcbContactService, deleteMcbContactService, } from "./irrigation.service.js";
+import { createLightScheduleService, listLightSchedulesService, getLightScheduleByIdService, updateLightScheduleService, deleteLightScheduleService, createMcbContactService, listMcbContactsService, getMcbContactByIdService, updateMcbContactService, deleteMcbContactService, createRecommendationService, listRecommendationsService, } from "./irrigation.service.js";
 import { prisma } from "../../lib/prisma.js";
 import { Role } from "../../generated/prisma/client.js";
 // ==========================================
@@ -185,5 +185,37 @@ export const deleteMcbContact = async (req, res) => {
     catch (error) {
         console.error("Delete MCB contact error:", error);
         res.status(400).json({ error: error.message || "Failed to delete MCB contact." });
+    }
+};
+// ==========================================
+// 3. IRRIGATION RECOMMENDATION CONTROLLERS
+// ==========================================
+export const createRecommendation = async (req, res) => {
+    try {
+        const recommendation = await createRecommendationService(req.body);
+        res.status(201).json({ message: "Irrigation recommendation created successfully.", recommendation });
+    }
+    catch (error) {
+        console.error("Create irrigation recommendation error:", error);
+        res.status(400).json({ error: error.message || "Failed to create recommendation." });
+    }
+};
+export const listRecommendations = async (req, res) => {
+    try {
+        if (!req.user) {
+            res.status(401).json({ error: "Unauthorized." });
+            return;
+        }
+        const { farmerId } = req.query;
+        const recommendations = await listRecommendationsService({
+            role: req.user.role,
+            requesterId: BigInt(req.user.id),
+            farmerId: farmerId ? BigInt(farmerId) : undefined,
+        });
+        res.status(200).json({ recommendations });
+    }
+    catch (error) {
+        console.error("List recommendations error:", error);
+        res.status(500).json({ error: "Failed to retrieve recommendations." });
     }
 };

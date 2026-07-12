@@ -1,11 +1,5 @@
-/**
- * Directly runs AI classification on the uploaded crop image
- * Supports: Gemini, OpenAI, Plant.id, and a smart Mock Fallback
- */
 export const analyzeCropImage = async (imageUrl, cropType) => {
     const geminiKey = process.env.GEMINI_API_KEY;
-    const openaiKey = process.env.OPENAI_API_KEY;
-    const plantIdKey = process.env.PLANT_ID_API_KEY;
     // 1. Try Gemini Multimodal API if configured
     if (geminiKey) {
         try {
@@ -16,7 +10,7 @@ export const analyzeCropImage = async (imageUrl, cropType) => {
             const buffer = await imgRes.arrayBuffer();
             const base64Image = Buffer.from(buffer).toString("base64");
             const mimeType = imgRes.headers.get("content-type") || "image/jpeg";
-            const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`;
+            const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
             const response = await fetch(geminiUrl, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -48,87 +42,6 @@ export const analyzeCropImage = async (imageUrl, cropType) => {
         }
         catch (error) {
             console.error("Gemini API call failed, falling back:", error);
-        }
-    }
-    // 2. Try OpenAI Multimodal API if configured
-    if (openaiKey) {
-        try {
-            console.log("Calling OpenAI API for crop disease detection...");
-            const response = await fetch("https://api.openai.com/v1/chat/completions", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${openaiKey}`
-                },
-                body: JSON.stringify({
-                    model: "gpt-4o-mini",
-                    response_format: { type: "json_object" },
-                    messages: [
-                        {
-                            role: "user",
-                            content: [
-                                {
-                                    type: "text",
-                                    text: `You are an expert plant pathologist. Analyze the image. Identify if there is a disease for the crop: ${cropType || "Unknown"}. Return a JSON object with this exact schema: { "detectedDisease": string (name of disease, or 'Healthy'), "confidenceScore": number (0 to 100), "recommendation": string (treatment recommendations) }.`
-                                },
-                                {
-                                    type: "image_url",
-                                    image_url: { url: imageUrl }
-                                }
-                            ]
-                        }
-                    ]
-                })
-            });
-            if (!response.ok) {
-                throw new Error(`OpenAI API error: ${response.statusText}`);
-            }
-            const resData = await response.json();
-            const jsonText = resData.choices?.[0]?.message?.content;
-            if (jsonText) {
-                const parsed = JSON.parse(jsonText.trim());
-                return {
-                    detectedDisease: parsed.detectedDisease || "Unknown Disease",
-                    confidenceScore: Number(parsed.confidenceScore) || 80.0,
-                    recommendation: parsed.recommendation || "Maintain crop health.",
-                };
-            }
-        }
-        catch (error) {
-            console.error("OpenAI API call failed, falling back:", error);
-        }
-    }
-    // 3. Try Plant.id API if configured
-    if (plantIdKey) {
-        try {
-            console.log("Calling Plant.id API for crop disease detection...");
-            const response = await fetch("https://api.plant.id/v2/identify", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Api-Key": plantIdKey
-                },
-                body: JSON.stringify({
-                    images: [imageUrl],
-                    modifiers: ["crops_fast"],
-                    disease_details: ["description", "treatment"]
-                })
-            });
-            if (!response.ok) {
-                throw new Error(`Plant.id API error: ${response.statusText}`);
-            }
-            const resData = await response.json();
-            const diseaseSuggestion = resData.health_assessment?.diseases?.[0];
-            if (diseaseSuggestion) {
-                return {
-                    detectedDisease: diseaseSuggestion.name || "Unknown Plant Disease",
-                    confidenceScore: (diseaseSuggestion.probability * 100) || 75.0,
-                    recommendation: diseaseSuggestion.disease_details?.treatment?.chemical?.[0] || "Apply standard fungicide.",
-                };
-            }
-        }
-        catch (error) {
-            console.error("Plant.id API call failed, falling back:", error);
         }
     }
     // 4. Smart Fallback Mock AI Response (for out-of-the-box local testing)

@@ -5,7 +5,9 @@ import {
   UpdateLightScheduleInput,
   CreateMcbContactInput,
   UpdateMcbContactInput,
+  CreateRecommendationInput,
 } from "./irrigation.schema.js";
+import { Role, Prisma } from "../../generated/prisma/client.js";
 
 // Helper utility to parse time string "HH:MM:SS" or "HH:MM" into a JavaScript Date object
 export const parseTimeToDate = (timeStr: string): Date => {
@@ -218,5 +220,71 @@ export const deleteMcbContactService = async (id: bigint) => {
 
   return await prisma.mcbContact.delete({
     where: { id },
+  });
+};
+
+// ==========================================
+// 3. IRRIGATION RECOMMENDATION SERVICES
+// ==========================================
+
+export const createRecommendationService = async (data: CreateRecommendationInput) => {
+  const { farmerId, areaId, cropType, recommendationText, waterAmountLiters, recommendedDate } = data;
+
+  // Validate farmer exists
+  const farmer = await prisma.user.findUnique({
+    where: { id: BigInt(farmerId) },
+  });
+  if (!farmer || farmer.role !== Role.farmer) {
+    throw new Error("Target Farmer not found.");
+  }
+
+  // Validate area if provided
+  if (areaId !== undefined) {
+    const area = await prisma.area.findUnique({
+      where: { id: BigInt(areaId) },
+    });
+    if (!area) {
+      throw new Error("Area not found.");
+    }
+  }
+
+  return await prisma.irrigationRecommendation.create({
+    data: {
+      farmerId: BigInt(farmerId),
+      areaId: areaId !== undefined ? BigInt(areaId) : null,
+      cropType: cropType || null,
+      recommendationText: recommendationText || null,
+      waterAmountLiters: waterAmountLiters !== undefined ? new Prisma.Decimal(waterAmountLiters) : null,
+      recommendedDate: recommendedDate || null,
+    },
+    include: {
+      farmer: { select: { id: true, name: true } },
+      area: true,
+    },
+  });
+};
+
+export const listRecommendationsService = async (filters: {
+  role: Role;
+  requesterId: bigint;
+  farmerId?: bigint;
+}) => {
+  const where: any = {};
+
+  if (filters.role === Role.farmer) {
+    where.farmerId = filters.requesterId;
+  } else {
+    if (filters.farmerId) {
+      where.farmerId = BigInt(filters.farmerId);
+    }
+  }
+
+  return await prisma.irrigationRecommendation.findMany({
+    where,
+    include: {
+      farmer: { select: { id: true, name: true } },
+      area: true,
+    },
+    orderBy: { generatedAt: "desc" },
   });
 };

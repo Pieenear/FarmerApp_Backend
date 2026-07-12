@@ -1,8 +1,8 @@
 import { Router } from "express";
-import { createLightSchedule, listLightSchedules, getLightScheduleById, updateLightSchedule, deleteLightSchedule, createMcbContact, listMcbContacts, getMcbContactById, updateMcbContact, deleteMcbContact, } from "./irrigation.controller.js";
+import { createLightSchedule, listLightSchedules, getLightScheduleById, updateLightSchedule, deleteLightSchedule, createMcbContact, listMcbContacts, getMcbContactById, updateMcbContact, deleteMcbContact, createRecommendation, listRecommendations, } from "./irrigation.controller.js";
 import { authMiddleware, requireRole } from "../../middlewares/auth.middleware.js";
 import { validateRequest } from "../../middlewares/validation.middleware.js";
-import { createLightScheduleSchema, updateLightScheduleSchema, createMcbContactSchema, updateMcbContactSchema, } from "./irrigation.schema.js";
+import { createLightScheduleSchema, updateLightScheduleSchema, createMcbContactSchema, updateMcbContactSchema, createRecommendationSchema, } from "./irrigation.schema.js";
 import { Role } from "../../generated/prisma/client.js";
 const router = Router();
 // ==========================================
@@ -21,4 +21,9 @@ router.get("/contacts", authMiddleware, listMcbContacts);
 router.get("/contacts/:id", authMiddleware, getMcbContactById);
 router.patch("/contacts/:id", authMiddleware, requireRole([Role.admin]), validateRequest(updateMcbContactSchema), updateMcbContact);
 router.delete("/contacts/:id", authMiddleware, requireRole([Role.admin]), deleteMcbContact);
+// ==========================================
+// 3. IRRIGATION RECOMMENDATION ROUTES
+// ==========================================
+router.post("/recommendations", authMiddleware, requireRole([Role.admin]), validateRequest(createRecommendationSchema), createRecommendation);
+router.get("/recommendations", authMiddleware, listRecommendations);
 export default router;
