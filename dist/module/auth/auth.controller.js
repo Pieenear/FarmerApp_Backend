@@ -1,4 +1,4 @@
-import { signupFarmerService, signupAdminService, loginUserService, getUserByIdService, } from "./auth.service.js";
+import { signupFarmerService, signupAdminService, loginUserService, getUserByIdService, updateProfileService, } from "./auth.service.js";
 export const signupFarmer = async (req, res) => {
     try {
         const result = await signupFarmerService(req.body);
@@ -52,5 +52,23 @@ export const getMe = async (req, res) => {
     catch (error) {
         console.error("Get me controller error:", error);
         res.status(404).json({ error: error.message || "User profile not found." });
+    }
+};
+export const updateProfile = async (req, res) => {
+    try {
+        if (!req.user) {
+            res.status(401).json({ error: "Not authenticated." });
+            return;
+        }
+        const userId = BigInt(req.user.id);
+        const updatedUser = await updateProfileService(userId, req.body);
+        res.status(200).json({
+            message: "Profile updated successfully.",
+            user: updatedUser,
+        });
+    }
+    catch (error) {
+        console.error("Update profile controller error:", error);
+        res.status(400).json({ error: error.message || "Failed to update profile." });
     }
 };

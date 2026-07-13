@@ -1,5 +1,6 @@
 import { prisma } from "../../lib/prisma.js";
 import { Severity } from "../../generated/prisma/client.js";
+import { translateText } from "../../lib/translator.js";
 export const createWeatherAlertService = async (data) => {
     const { areaId, alertType, message, severity, validFrom, validTo, source } = data;
     const area = await prisma.area.findUnique({
@@ -10,13 +11,19 @@ export const createWeatherAlertService = async (data) => {
     }
     const parsedValidFrom = validFrom ? new Date(validFrom) : new Date();
     const parsedValidTo = validTo ? new Date(validTo) : null;
+    let dbMessage = message;
+    let marathiMessage = "";
+    if (message) {
+        marathiMessage = await translateText(message, "mr");
+        dbMessage = JSON.stringify({ en: message, mr: marathiMessage });
+    }
     return await prisma.$transaction(async (tx) => {
         // 1. Create WeatherAlert
         const alert = await tx.weatherAlert.create({
             data: {
                 areaId: BigInt(areaId),
                 alertType,
-                message,
+                message: dbMessage,
                 severity: severity || Severity.medium,
                 validFrom: parsedValidFrom,
                 validTo: parsedValidTo,
@@ -29,18 +36,24 @@ export const createWeatherAlertService = async (data) => {
         // 2. Fetch all users registered in this Area
         const users = await tx.user.findMany({
             where: { areaId: BigInt(areaId), isActive: true },
-            select: { id: true },
+            select: { id: true, languagePref: true },
         });
         // 3. Create Notifications in bulk for all target area users
         if (users.length > 0) {
             await tx.notification.createMany({
-                data: users.map((u) => ({
-                    userId: u.id,
-                    title: `[${(severity || Severity.medium).toUpperCase()}] Weather Alert: ${alertType}`,
-                    message,
-                    type: "weather_alert",
-                    referenceId: alert.id,
-                })),
+                data: users.map((u) => {
+                    let userMsg = message;
+                    if (marathiMessage) {
+                        userMsg = u.languagePref === "mr" ? marathiMessage : message;
+                    }
+                    return {
+                        userId: u.id,
+                        title: `[${(severity || Severity.medium).toUpperCase()}] Weather Alert: ${alertType}`,
+                        message: userMsg,
+                        type: "weather_alert",
+                        referenceId: alert.id,
+                    };
+                }),
             });
         }
         return alert;
@@ -92,12 +105,17 @@ export const updateWeatherAlertService = async (id, data) => {
             throw new Error("Target Area not found.");
         }
     }
+    let dbMessage = undefined;
+    if (message !== undefined && message !== null) {
+        const marathiMsg = await translateText(message, "mr");
+        dbMessage = JSON.stringify({ en: message, mr: marathiMsg });
+    }
     return await prisma.weatherAlert.update({
         where: { id },
         data: {
             areaId: areaId !== undefined ? BigInt(areaId) : undefined,
             alertType: alertType !== undefined ? alertType : undefined,
-            message: message !== undefined ? message : undefined,
+            message: dbMessage,
             severity: severity !== undefined ? severity : undefined,
             validFrom: validFrom !== undefined ? (validFrom ? new Date(validFrom) : null) : undefined,
             validTo: validTo !== undefined ? (validTo ? new Date(validTo) : null) : undefined,

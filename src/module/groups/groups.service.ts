@@ -62,6 +62,7 @@ export const listGroupsService = async (filters: { areaId?: bigint; cropType?: s
     include: {
       area: true,
       _count: { select: { members: true } },
+      members: { select: { farmerId: true } },
     },
   });
 };

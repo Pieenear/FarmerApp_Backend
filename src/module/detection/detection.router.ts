@@ -5,6 +5,7 @@ import {
   getDetectionLogById,
   updateDetectionLog,
   deleteDetectionLog,
+  uploadImage,
 } from "./detection.controller.js";
 import { authMiddleware } from "../../middlewares/auth.middleware.js";
 import { validateRequest } from "../../middlewares/validation.middleware.js";
@@ -15,6 +16,12 @@ const router = Router();
 // ==========================================
 // DISEASE DETECTION LOG ROUTES
 // ==========================================
+router.post(
+  "/upload",
+  authMiddleware,
+  uploadImage
+);
+
 router.post(
   "/logs",
   authMiddleware,

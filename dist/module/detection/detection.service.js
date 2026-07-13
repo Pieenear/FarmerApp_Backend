@@ -39,7 +39,7 @@ export const createDetectionLogService = async (data, requesterId) => {
     // Only run AI if farmer creates it and didn't provide override parameters
     if (!aiDisease) {
         try {
-            const analysis = await analyzeCropImage(imageUrl, cropType || undefined);
+            const analysis = await analyzeCropImage(imageUrl, cropType || undefined, farmer.languagePref);
             aiDisease = analysis.detectedDisease;
             aiConfidence = analysis.confidenceScore;
             aiRecommendation = analysis.recommendation;

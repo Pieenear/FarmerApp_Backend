@@ -8,6 +8,7 @@ import {
   CreateRecommendationInput,
 } from "./irrigation.schema.js";
 import { Role, Prisma } from "../../generated/prisma/client.js";
+import { translateText } from "../../lib/translator.js";
 
 // Helper utility to parse time string "HH:MM:SS" or "HH:MM" into a JavaScript Date object
 export const parseTimeToDate = (timeStr: string): Date => {
@@ -248,12 +249,18 @@ export const createRecommendationService = async (data: CreateRecommendationInpu
     }
   }
 
+  let dbRecText = recommendationText;
+  if (recommendationText) {
+    const marathiMsg = await translateText(recommendationText, "mr");
+    dbRecText = JSON.stringify({ en: recommendationText, mr: marathiMsg });
+  }
+
   return await prisma.irrigationRecommendation.create({
     data: {
       farmerId: BigInt(farmerId),
       areaId: areaId !== undefined ? BigInt(areaId) : null,
       cropType: cropType || null,
-      recommendationText: recommendationText || null,
+      recommendationText: dbRecText || null,
       waterAmountLiters: waterAmountLiters !== undefined ? new Prisma.Decimal(waterAmountLiters) : null,
       recommendedDate: recommendedDate || null,
     },

@@ -123,3 +123,46 @@ export const deleteDetectionLog = async (req: Request, res: Response): Promise<v
     res.status(400).json({ error: error.message || "Failed to delete detection log." });
   }
 };
+
+import fs from "fs";
+import path from "path";
+
+export const uploadImage = async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!req.user) {
+      res.status(401).json({ error: "Unauthorized." });
+      return;
+    }
+
+    const { imageBase64, fileName } = req.body;
+    if (!imageBase64) {
+      res.status(400).json({ error: "Missing imageBase64 data." });
+      return;
+    }
+
+    // Strip data URI prefix if it exists
+    const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, "");
+    const buffer = Buffer.from(base64Data, "base64");
+
+    // Get file extension or default to .jpg
+    const extension = fileName ? path.extname(fileName) : ".jpg";
+    const uniqueName = `img_${Date.now()}_${Math.round(Math.random() * 1e9)}${extension}`;
+    
+    const uploadsDir = path.join(process.cwd(), "uploads");
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+
+    const filePath = path.join(uploadsDir, uniqueName);
+    fs.writeFileSync(filePath, buffer);
+
+    const protocol = req.headers["x-forwarded-proto"] || req.protocol;
+    const host = req.get("host");
+    const publicUrl = `${protocol}://${host}/uploads/${uniqueName}`;
+
+    res.status(200).json({ imageUrl: publicUrl });
+  } catch (error: any) {
+    console.error("Upload image controller error:", error);
+    res.status(500).json({ error: error.message || "Failed to upload image." });
+  }
+};

@@ -40,7 +40,26 @@ export const listWeatherAlerts = async (req, res) => {
             severity: severity,
             activeOnly: activeOnly === "true",
         });
-        res.status(200).json({ alerts });
+        const lang = dbUser?.languagePref || (req.headers["accept-language"]?.includes("mr") ? "mr" : "en");
+        const localizedAlerts = alerts.map((alert) => {
+            let localizedMsg = alert.message;
+            if (alert.message) {
+                try {
+                    const parsed = JSON.parse(alert.message);
+                    if (parsed && typeof parsed === "object") {
+                        localizedMsg = parsed[lang] || parsed.en || alert.message;
+                    }
+                }
+                catch (e) {
+                    // fallback
+                }
+            }
+            return {
+                ...alert,
+                message: localizedMsg,
+            };
+        });
+        res.status(200).json({ alerts: localizedAlerts });
     }
     catch (error) {
         console.error("List weather alerts error:", error);
@@ -55,7 +74,28 @@ export const getWeatherAlertById = async (req, res) => {
             return;
         }
         const alert = await getWeatherAlertByIdService(BigInt(id));
-        res.status(200).json({ alert });
+        const dbUser = req.user
+            ? await prisma.user.findUnique({ where: { id: BigInt(req.user.id) } })
+            : null;
+        const lang = dbUser?.languagePref || (req.headers["accept-language"]?.includes("mr") ? "mr" : "en");
+        let localizedMsg = alert.message;
+        if (alert.message) {
+            try {
+                const parsed = JSON.parse(alert.message);
+                if (parsed && typeof parsed === "object") {
+                    localizedMsg = parsed[lang] || parsed.en || alert.message;
+                }
+            }
+            catch (e) {
+                // fallback
+            }
+        }
+        res.status(200).json({
+            alert: {
+                ...alert,
+                message: localizedMsg,
+            },
+        });
     }
     catch (error) {
         console.error("Get weather alert error:", error);

@@ -49,6 +49,7 @@ export const listGroupsService = async (filters) => {
         include: {
             area: true,
             _count: { select: { members: true } },
+            members: { select: { farmerId: true } },
         },
     });
 };

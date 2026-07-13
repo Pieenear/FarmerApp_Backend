@@ -247,7 +247,30 @@ export const listRecommendations = async (req: Request, res: Response): Promise<
       farmerId: farmerId ? BigInt(farmerId as string) : undefined,
     });
 
-    res.status(200).json({ recommendations });
+    const dbUser = await prisma.user.findUnique({
+      where: { id: BigInt(req.user.id) },
+    });
+    const lang = dbUser?.languagePref || (req.headers["accept-language"]?.includes("mr") ? "mr" : "en");
+
+    const localizedRecommendations = recommendations.map((rec) => {
+      let localizedMsg = rec.recommendationText;
+      if (rec.recommendationText) {
+        try {
+          const parsed = JSON.parse(rec.recommendationText);
+          if (parsed && typeof parsed === "object") {
+            localizedMsg = parsed[lang] || parsed.en || rec.recommendationText;
+          }
+        } catch (e) {
+          // fallback
+        }
+      }
+      return {
+        ...rec,
+        recommendationText: localizedMsg,
+      };
+    });
+
+    res.status(200).json({ recommendations: localizedRecommendations });
   } catch (error: any) {
     console.error("List recommendations error:", error);
     res.status(500).json({ error: "Failed to retrieve recommendations." });

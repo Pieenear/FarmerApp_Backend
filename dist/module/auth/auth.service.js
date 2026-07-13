@@ -118,6 +118,9 @@ export const loginUserService = async (data) => {
     if (!user.isActive) {
         throw new Error("Access denied. Your account is deactivated.");
     }
+    if (!user.isVerified) {
+        throw new Error("Access denied. Your account is pending verification by an admin.");
+    }
     const isMatch = await bcrypt.compare(password, user.passwordHash);
     if (!isMatch) {
         throw new Error("Invalid phone number or password.");
@@ -141,4 +144,47 @@ export const getUserByIdService = async (id) => {
         throw new Error("User not found.");
     }
     return sanitizeUser(user);
+};
+export const updateProfileService = async (userId, data) => {
+    const { name, areaId, languagePref, farmSizeAcres, landLocation, primaryCrops, landSurveyNo, } = data;
+    await prisma.$transaction(async (tx) => {
+        // Update User fields
+        await tx.user.update({
+            where: { id: userId },
+            data: {
+                name: name !== undefined ? name : undefined,
+                areaId: areaId !== undefined ? (areaId ? BigInt(areaId) : null) : undefined,
+                languagePref: languagePref !== undefined ? languagePref : undefined,
+            },
+        });
+        // Check if profile exists, update or create
+        const existingProfile = await tx.farmerProfile.findUnique({
+            where: { userId: userId },
+        });
+        if (existingProfile) {
+            await tx.farmerProfile.update({
+                where: { userId: userId },
+                data: {
+                    farmSizeAcres: farmSizeAcres !== undefined ? (farmSizeAcres ? Number(farmSizeAcres) : null) : undefined,
+                    landLocation: landLocation !== undefined ? landLocation : undefined,
+                    primaryCrops: primaryCrops !== undefined ? primaryCrops : undefined,
+                    landSurveyNo: landSurveyNo !== undefined ? landSurveyNo : undefined,
+                },
+            });
+        }
+        else {
+            await tx.farmerProfile.create({
+                data: {
+                    userId: userId,
+                    farmSizeAcres: farmSizeAcres ? Number(farmSizeAcres) : null,
+                    landLocation: landLocation || null,
+                    primaryCrops: primaryCrops || null,
+                    landSurveyNo: landSurveyNo || null,
+                },
+            });
+        }
+    }, {
+        timeout: 20000
+    });
+    return getUserByIdService(userId);
 };
