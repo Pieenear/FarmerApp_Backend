@@ -101,6 +101,26 @@ export const uploadReportService = async (data, adminId) => {
                 remarks: "Lab report uploaded, request marked as completed.",
             },
         });
+        // Create Notification for the farmer
+        const reportTypeTitleEn = reportType === ReportType.soil ? "Soil Test Report" : "Water Test Report";
+        const reportTypeTitleMr = reportType === ReportType.soil ? "माती चाचणी अहवाल" : "पाणी चाचणी अहवाल";
+        const notifTitle = JSON.stringify({
+            en: `New Lab Report Available: ${reportTypeTitleEn}`,
+            mr: `नवीन लॅब अहवाल उपलब्ध: ${reportTypeTitleMr}`,
+        });
+        const notifMsg = JSON.stringify({
+            en: finalSimplified?.summaryText || "Your lab report is ready for viewing.",
+            mr: finalSimplified?.summaryText || "तुमचा लॅब अहवाल पाहण्यासाठी तयार आहे.",
+        });
+        await tx.notification.create({
+            data: {
+                userId: request.farmerId,
+                title: notifTitle,
+                message: notifMsg,
+                type: "lab_report",
+                referenceId: labReport.id,
+            },
+        });
         // 4. Release assigned Ground Staff if present
         if (request.assignedStaffId) {
             await tx.groundStaff.update({

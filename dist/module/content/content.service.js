@@ -1,7 +1,7 @@
 import { prisma } from "../../lib/prisma.js";
 import { ContentStatus, Role } from "../../generated/prisma/client.js";
 export const createContentService = async (data, adminId) => {
-    const { title, content, category, imageUrl, areaId, status } = data;
+    const { title, titleMr, content, contentMr, category, imageUrl, areaId, status } = data;
     if (areaId !== undefined && areaId !== null) {
         const area = await prisma.area.findUnique({
             where: { id: BigInt(areaId) },
@@ -11,10 +11,14 @@ export const createContentService = async (data, adminId) => {
         }
     }
     const isPublished = status === ContentStatus.published;
-    return await prisma.agriContent.create({
+    const marathiTitle = titleMr || title;
+    const marathiContent = contentMr || content;
+    const dbTitle = JSON.stringify({ en: title, mr: marathiTitle });
+    const dbContent = JSON.stringify({ en: content, mr: marathiContent });
+    const createdContent = await prisma.agriContent.create({
         data: {
-            title,
-            content,
+            title: dbTitle,
+            content: dbContent,
             category,
             imageUrl: imageUrl || null,
             areaId: areaId ? BigInt(areaId) : null,
@@ -26,6 +30,41 @@ export const createContentService = async (data, adminId) => {
             area: true,
         },
     });
+    if (isPublished) {
+        try {
+            const targetFarmers = await prisma.user.findMany({
+                where: {
+                    role: Role.farmer,
+                    isActive: true,
+                    ...(areaId ? { areaId: BigInt(areaId) } : {}),
+                },
+                select: { id: true },
+            });
+            if (targetFarmers.length > 0) {
+                const notifTitle = JSON.stringify({
+                    en: title,
+                    mr: marathiTitle,
+                });
+                const notifMsg = JSON.stringify({
+                    en: content.length > 120 ? content.substring(0, 120) + "..." : content,
+                    mr: marathiContent.length > 120 ? marathiContent.substring(0, 120) + "..." : marathiContent,
+                });
+                await prisma.notification.createMany({
+                    data: targetFarmers.map((f) => ({
+                        userId: f.id,
+                        title: notifTitle,
+                        message: notifMsg,
+                        type: "news",
+                        referenceId: createdContent.id,
+                    })),
+                });
+            }
+        }
+        catch (e) {
+            console.error("Failed to create notifications for published content:", e);
+        }
+    }
+    return createdContent;
 };
 export const listContentService = async (filters) => {
     const where = {};
@@ -36,10 +75,15 @@ export const listContentService = async (filters) => {
         // Farmers only see published advisories
         where.status = ContentStatus.published;
         // Localized context: global articles (areaId is null) or specific to the farmer's area
-        where.OR = [
-            { areaId: null },
-            { areaId: filters.farmerAreaId ? BigInt(filters.farmerAreaId) : undefined },
-        ];
+        if (filters.farmerAreaId) {
+            where.OR = [
+                { areaId: null },
+                { areaId: BigInt(filters.farmerAreaId) },
+            ];
+        }
+        else {
+            where.areaId = null;
+        }
     }
     else {
         // Admins can query all statuses, categories, or specific areas
@@ -73,7 +117,7 @@ export const getContentByIdService = async (id) => {
     return article;
 };
 export const updateContentService = async (id, data) => {
-    const { title, content, category, imageUrl, areaId, status } = data;
+    const { title, titleMr, content, contentMr, category, imageUrl, areaId, status } = data;
     const existing = await prisma.agriContent.findUnique({
         where: { id },
     });
@@ -96,11 +140,21 @@ export const updateContentService = async (id, data) => {
     else if (status === ContentStatus.draft || status === ContentStatus.archived) {
         publishedAtVal = null;
     }
+    let dbTitle = undefined;
+    if (title !== undefined) {
+        const marathiTitle = titleMr || title;
+        dbTitle = JSON.stringify({ en: title, mr: marathiTitle });
+    }
+    let dbContent = undefined;
+    if (content !== undefined) {
+        const marathiContent = contentMr || content;
+        dbContent = JSON.stringify({ en: content, mr: marathiContent });
+    }
     return await prisma.agriContent.update({
         where: { id },
         data: {
-            title: title !== undefined ? title : undefined,
-            content: content !== undefined ? content : undefined,
+            title: dbTitle,
+            content: dbContent,
             category: category !== undefined ? category : undefined,
             imageUrl: imageUrl !== undefined ? imageUrl || null : undefined,
             areaId: areaId !== undefined ? (areaId ? BigInt(areaId) : null) : undefined,

@@ -1,8 +1,7 @@
 import { prisma } from "../../lib/prisma.js";
 import { Severity } from "../../generated/prisma/client.js";
-import { translateText } from "../../lib/translator.js";
 export const createWeatherAlertService = async (data) => {
-    const { areaId, alertType, message, severity, validFrom, validTo, source } = data;
+    const { areaId, alertType, alertTypeMr, message, messageMr, severity, validFrom, validTo, source } = data;
     const area = await prisma.area.findUnique({
         where: { id: BigInt(areaId) },
     });
@@ -11,18 +10,16 @@ export const createWeatherAlertService = async (data) => {
     }
     const parsedValidFrom = validFrom ? new Date(validFrom) : new Date();
     const parsedValidTo = validTo ? new Date(validTo) : null;
-    let dbMessage = message;
-    let marathiMessage = "";
-    if (message) {
-        marathiMessage = await translateText(message, "mr");
-        dbMessage = JSON.stringify({ en: message, mr: marathiMessage });
-    }
+    const marathiAlertType = alertTypeMr || alertType;
+    const marathiMessage = messageMr || message;
+    const dbAlertType = JSON.stringify({ en: alertType, mr: marathiAlertType });
+    const dbMessage = JSON.stringify({ en: message, mr: marathiMessage });
     return await prisma.$transaction(async (tx) => {
         // 1. Create WeatherAlert
         const alert = await tx.weatherAlert.create({
             data: {
                 areaId: BigInt(areaId),
-                alertType,
+                alertType: dbAlertType,
                 message: dbMessage,
                 severity: severity || Severity.medium,
                 validFrom: parsedValidFrom,
@@ -42,14 +39,18 @@ export const createWeatherAlertService = async (data) => {
         if (users.length > 0) {
             await tx.notification.createMany({
                 data: users.map((u) => {
-                    let userMsg = message;
-                    if (marathiMessage) {
-                        userMsg = u.languagePref === "mr" ? marathiMessage : message;
-                    }
+                    const notifTitle = JSON.stringify({
+                        en: alertType,
+                        mr: marathiAlertType
+                    });
+                    const notifMsg = JSON.stringify({
+                        en: message,
+                        mr: marathiMessage
+                    });
                     return {
                         userId: u.id,
-                        title: `[${(severity || Severity.medium).toUpperCase()}] Weather Alert: ${alertType}`,
-                        message: userMsg,
+                        title: notifTitle,
+                        message: notifMsg,
                         type: "weather_alert",
                         referenceId: alert.id,
                     };
@@ -94,7 +95,7 @@ export const getWeatherAlertByIdService = async (id) => {
     return alert;
 };
 export const updateWeatherAlertService = async (id, data) => {
-    const { areaId, alertType, message, severity, validFrom, validTo, source } = data;
+    const { areaId, alertType, alertTypeMr, message, messageMr, severity, validFrom, validTo, source } = data;
     const existing = await prisma.weatherAlert.findUnique({ where: { id } });
     if (!existing) {
         throw new Error("Weather alert not found.");
@@ -105,17 +106,22 @@ export const updateWeatherAlertService = async (id, data) => {
             throw new Error("Target Area not found.");
         }
     }
+    let dbAlertType = undefined;
+    if (alertType !== undefined && alertType !== null) {
+        const marathiType = alertTypeMr || alertType;
+        dbAlertType = JSON.stringify({ en: alertType, mr: marathiType });
+    }
     let dbMessage = undefined;
     if (message !== undefined && message !== null) {
-        const marathiMsg = await translateText(message, "mr");
+        const marathiMsg = messageMr || message;
         dbMessage = JSON.stringify({ en: message, mr: marathiMsg });
     }
     return await prisma.weatherAlert.update({
         where: { id },
         data: {
             areaId: areaId !== undefined ? BigInt(areaId) : undefined,
-            alertType: alertType !== undefined ? alertType : undefined,
-            message: dbMessage,
+            alertType: dbAlertType !== undefined ? dbAlertType : undefined,
+            message: dbMessage !== undefined ? dbMessage : undefined,
             severity: severity !== undefined ? severity : undefined,
             validFrom: validFrom !== undefined ? (validFrom ? new Date(validFrom) : null) : undefined,
             validTo: validTo !== undefined ? (validTo ? new Date(validTo) : null) : undefined,

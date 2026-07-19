@@ -214,6 +214,48 @@ export const updateRequestStatusService = async (
       },
     });
 
+    // Create Notification for the farmer
+    const statusTextEn: Record<string, string> = {
+      pending: "Pending",
+      accepted: "Accepted",
+      rejected: "Rejected",
+      assigned: "Assigned",
+      in_progress: "In Progress",
+      completed: "Completed",
+      cancelled: "Cancelled",
+    };
+
+    const statusTextMr: Record<string, string> = {
+      pending: "लंबित",
+      accepted: "स्वीकृत",
+      rejected: "नाकारले",
+      assigned: "कर्मचाऱ्याकडे सोपवले",
+      in_progress: "प्रगतीपथावर",
+      completed: "पूर्ण झाले",
+      cancelled: "रद्द केले",
+    };
+
+    const reqTypeFormatted = request.requestType.replace(/_/g, " ");
+    const notifTitle = JSON.stringify({
+      en: `Request Status Updated: ${statusTextEn[status] || status}`,
+      mr: `विनंतीची स्थिती अद्ययावत: ${statusTextMr[status] || status}`,
+    });
+
+    const notifMsg = JSON.stringify({
+      en: `Your ${reqTypeFormatted} request status has been updated to ${statusTextEn[status] || status}.${remarks ? ` Remarks: ${remarks}` : ""}`,
+      mr: `तुमच्या ${reqTypeFormatted} विनंतीची स्थिती ${statusTextMr[status] || status} केली आहे.${remarks ? ` टिप्पणी: ${remarks}` : ""}`,
+    });
+
+    await tx.notification.create({
+      data: {
+        userId: request.farmerId,
+        title: notifTitle,
+        message: notifMsg,
+        type: "request_update",
+        referenceId: requestId,
+      },
+    });
+
     // Side Effect: If crop selling request is accepted, create a CropListing record
     if (request.requestType === RequestType.crop_selling && status === RequestStatus.accepted) {
       const detail = await tx.cropSellingRequestDetail.findUnique({

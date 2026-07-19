@@ -40,7 +40,7 @@ export const listContent = async (req, res) => {
             status: status,
             areaId: areaId ? BigInt(areaId) : undefined,
         });
-        res.status(200).json({ articles });
+        res.status(200).json({ articles, contents: articles });
     }
     catch (error) {
         console.error("List agri content error:", error);

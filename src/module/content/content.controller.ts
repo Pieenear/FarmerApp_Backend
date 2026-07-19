@@ -55,7 +55,7 @@ export const listContent = async (req: Request, res: Response): Promise<void> =>
       areaId: areaId ? BigInt(areaId as string) : undefined,
     });
 
-    res.status(200).json({ articles });
+    res.status(200).json({ articles, contents: articles });
   } catch (error: any) {
     console.error("List agri content error:", error);
     res.status(500).json({ error: "Failed to retrieve agri content." });
