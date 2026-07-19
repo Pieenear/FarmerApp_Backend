@@ -188,3 +188,52 @@ export const updateProfileService = async (userId, data) => {
     });
     return getUserByIdService(userId);
 };
+export const getUsersService = async (filters) => {
+    const { role, isVerified, search } = filters;
+    const whereClause = {};
+    if (role) {
+        whereClause.role = role;
+    }
+    if (isVerified !== undefined) {
+        whereClause.isVerified = isVerified;
+    }
+    if (search) {
+        whereClause.OR = [
+            { name: { contains: search, mode: "insensitive" } },
+            { phone: { contains: search } },
+            { email: { contains: search, mode: "insensitive" } },
+        ];
+    }
+    const users = await prisma.user.findMany({
+        where: whereClause,
+        include: {
+            farmerProfile: true,
+            area: true,
+        },
+        orderBy: {
+            createdAt: "desc",
+        },
+    });
+    return users.map(sanitizeUser);
+};
+export const verifyUserService = async (userId, isVerified, adminId) => {
+    const user = await prisma.user.findUnique({
+        where: { id: userId },
+    });
+    if (!user) {
+        throw new Error("User not found.");
+    }
+    const updatedUser = await prisma.user.update({
+        where: { id: userId },
+        data: {
+            isVerified,
+            verifiedByAdminId: isVerified ? adminId : null,
+            verifiedAt: isVerified ? new Date() : null,
+        },
+        include: {
+            farmerProfile: true,
+            area: true,
+        },
+    });
+    return sanitizeUser(updatedUser);
+};

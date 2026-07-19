@@ -126,6 +126,7 @@ export const deleteDetectionLog = async (req: Request, res: Response): Promise<v
 
 import fs from "fs";
 import path from "path";
+import os from "os";
 
 export const uploadImage = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -141,7 +142,7 @@ export const uploadImage = async (req: Request, res: Response): Promise<void> =>
     }
 
     // Strip data URI prefix if it exists
-    const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, "");
+    const base64Data = imageBase64.replace(/^data:[^;]+;base64,/, "");
     const buffer = Buffer.from(base64Data, "base64");
 
     // Get file extension or default to .jpg
@@ -156,9 +157,35 @@ export const uploadImage = async (req: Request, res: Response): Promise<void> =>
     const filePath = path.join(uploadsDir, uniqueName);
     fs.writeFileSync(filePath, buffer);
 
-    const protocol = req.headers["x-forwarded-proto"] || req.protocol;
-    const host = req.get("host");
-    const publicUrl = `${protocol}://${host}/uploads/${uniqueName}`;
+    let serverUrl = process.env.BACKEND_URL;
+    if (!serverUrl) {
+      const protocol = req.headers["x-forwarded-proto"] || req.protocol;
+      let host = req.get("host") || "localhost:5000";
+
+      // If host is localhost/127.0.0.1, try to find local network IP
+      if (host.includes("localhost") || host.includes("127.0.0.1")) {
+        const interfaces = os.networkInterfaces();
+        let localIp = "";
+        for (const interfaceName in interfaces) {
+          const addresses = interfaces[interfaceName];
+          if (addresses) {
+            for (const addr of addresses) {
+              if (addr.family === "IPv4" && !addr.internal) {
+                localIp = addr.address;
+                break;
+              }
+            }
+          }
+          if (localIp) break;
+        }
+        if (localIp) {
+          host = host.replace("localhost", localIp).replace("127.0.0.1", localIp);
+        }
+      }
+      serverUrl = `${protocol}://${host}`;
+    }
+
+    const publicUrl = `${serverUrl}/uploads/${uniqueName}`;
 
     res.status(200).json({ imageUrl: publicUrl });
   } catch (error: any) {

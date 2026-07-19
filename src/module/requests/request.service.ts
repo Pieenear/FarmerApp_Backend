@@ -36,6 +36,11 @@ const requestDetailsInclude = {
       email: true,
     },
   },
+  labReports: {
+    include: {
+      simplifiedReport: true,
+    },
+  },
 };
 
 /**

@@ -245,3 +245,60 @@ export const updateProfileService = async (userId: bigint, data: any) => {
 
   return getUserByIdService(userId);
 };
+
+export const getUsersService = async (filters: { role?: string; isVerified?: boolean; search?: string }) => {
+  const { role, isVerified, search } = filters;
+  const whereClause: any = {};
+
+  if (role) {
+    whereClause.role = role;
+  }
+  if (isVerified !== undefined) {
+    whereClause.isVerified = isVerified;
+  }
+  if (search) {
+    whereClause.OR = [
+      { name: { contains: search, mode: "insensitive" } },
+      { phone: { contains: search } },
+      { email: { contains: search, mode: "insensitive" } },
+    ];
+  }
+
+  const users = await prisma.user.findMany({
+    where: whereClause,
+    include: {
+      farmerProfile: true,
+      area: true,
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
+
+  return users.map(sanitizeUser);
+};
+
+export const verifyUserService = async (userId: bigint, isVerified: boolean, adminId: bigint) => {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+  });
+
+  if (!user) {
+    throw new Error("User not found.");
+  }
+
+  const updatedUser = await prisma.user.update({
+    where: { id: userId },
+    data: {
+      isVerified,
+      verifiedByAdminId: isVerified ? adminId : null,
+      verifiedAt: isVerified ? new Date() : null,
+    },
+    include: {
+      farmerProfile: true,
+      area: true,
+    },
+  });
+
+  return sanitizeUser(updatedUser);
+};

@@ -1,5 +1,6 @@
 import { prisma } from "../../lib/prisma.js";
 import { ReportType, RequestStatus, Role, AvailabilityStatus, Prisma } from "../../generated/prisma/client.js";
+import { analyzeLabReport } from "../detection/ai.service.js";
 /**
  * Service to upload a Lab Report (Admin only)
  * This automatically:
@@ -13,6 +14,7 @@ export const uploadReportService = async (data, adminId) => {
     const { requestId, reportType, rawFileUrl, simplified } = data;
     const request = await prisma.serviceRequest.findUnique({
         where: { id: BigInt(requestId) },
+        include: { farmer: true }
     });
     if (!request) {
         throw new Error("Service request not found.");
@@ -31,6 +33,30 @@ export const uploadReportService = async (data, adminId) => {
     if (existingReport) {
         throw new Error("A lab report has already been uploaded for this request.");
     }
+    let finalSimplified = simplified;
+    if (!finalSimplified || !finalSimplified.summaryText) {
+        const languagePref = request.farmer?.languagePref || "en";
+        try {
+            const aiResult = await analyzeLabReport(rawFileUrl, reportType, languagePref);
+            finalSimplified = {
+                summaryText: aiResult.summaryText,
+                healthScore: aiResult.healthScore,
+                keyParameters: aiResult.keyParameters,
+                recommendations: aiResult.recommendations,
+                language: languagePref,
+            };
+        }
+        catch (err) {
+            console.error("AI simplification failed during upload, using fallback:", err);
+            finalSimplified = {
+                summaryText: "Lab report uploaded. Actionable recommendations are being processed.",
+                healthScore: 80,
+                keyParameters: {},
+                recommendations: "Please consult with ground staff for detailed advice.",
+                language: languagePref,
+            };
+        }
+    }
     const previousStatus = request.status;
     return await prisma.$transaction(async (tx) => {
         // 1. Create the Lab Report
@@ -40,14 +66,14 @@ export const uploadReportService = async (data, adminId) => {
                 reportType,
                 rawFileUrl,
                 uploadedByAdminId: adminId,
-                simplifiedReport: simplified
+                simplifiedReport: finalSimplified
                     ? {
                         create: {
-                            summaryText: simplified.summaryText || null,
-                            healthScore: simplified.healthScore !== undefined ? simplified.healthScore : null,
-                            keyParameters: simplified.keyParameters ? simplified.keyParameters : Prisma.DbNull,
-                            recommendations: simplified.recommendations || null,
-                            language: simplified.language || "en",
+                            summaryText: finalSimplified.summaryText || null,
+                            healthScore: finalSimplified.healthScore !== undefined ? finalSimplified.healthScore : null,
+                            keyParameters: finalSimplified.keyParameters ? finalSimplified.keyParameters : Prisma.DbNull,
+                            recommendations: finalSimplified.recommendations || null,
+                            language: finalSimplified.language || "en",
                         },
                     }
                     : undefined,

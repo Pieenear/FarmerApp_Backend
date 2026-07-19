@@ -5,6 +5,8 @@ import {
   loginUserService,
   getUserByIdService,
   updateProfileService,
+  getUsersService,
+  verifyUserService,
 } from "./auth.service.js";
 
 export const signupFarmer = async (req: Request, res: Response): Promise<void> => {
@@ -78,5 +80,42 @@ export const updateProfile = async (req: Request, res: Response): Promise<void> 
   } catch (error: any) {
     console.error("Update profile controller error:", error);
     res.status(400).json({ error: error.message || "Failed to update profile." });
+  }
+};
+
+export const getUsers = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const role = req.query.role as string | undefined;
+    const isVerified = req.query.isVerified !== undefined ? req.query.isVerified === "true" : undefined;
+    const search = req.query.search as string | undefined;
+
+    const users = await getUsersService({ role, isVerified, search });
+    res.status(200).json({ users });
+  } catch (error: any) {
+    console.error("Get users controller error:", error);
+    res.status(500).json({ error: "Failed to retrieve users." });
+  }
+};
+
+export const verifyUser = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    if (typeof id !== "string") {
+      res.status(400).json({ error: "Invalid user ID format." });
+      return;
+    }
+    if (!req.user) {
+      res.status(401).json({ error: "Not authenticated." });
+      return;
+    }
+    const isVerified = req.body.isVerified !== undefined ? Boolean(req.body.isVerified) : true;
+    const user = await verifyUserService(BigInt(id), isVerified, BigInt(req.user.id));
+    res.status(200).json({
+      message: `User verification status updated successfully.`,
+      user,
+    });
+  } catch (error: any) {
+    console.error("Verify user controller error:", error);
+    res.status(400).json({ error: error.message || "Failed to update verification status." });
   }
 };

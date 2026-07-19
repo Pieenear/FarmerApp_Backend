@@ -140,6 +140,14 @@ export const listCropListingsService = async (
         },
       },
       request: true,
+      buyerMatches: {
+        include: {
+          buyer: true,
+          matchedByAdmin: {
+            select: { id: true, name: true },
+          },
+        },
+      },
     },
     orderBy: { createdAt: "desc" },
   });

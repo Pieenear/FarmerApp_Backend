@@ -33,6 +33,11 @@ const requestDetailsInclude = {
             email: true,
         },
     },
+    labReports: {
+        include: {
+            simplifiedReport: true,
+        },
+    },
 };
 /**
  * Service to raise a new request for a farmer
