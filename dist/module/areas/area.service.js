@@ -28,3 +28,22 @@ export const getAreaByIdService = async (id) => {
     }
     return area;
 };
+// Service to update an area
+export const updateAreaService = async (id, data) => {
+    return await prisma.area.update({
+        where: { id },
+        data: {
+            ...(data.name !== undefined && { name: data.name }),
+            ...(data.taluka !== undefined && { taluka: data.taluka || null }),
+            ...(data.district !== undefined && { district: data.district || null }),
+            ...(data.state !== undefined && { state: data.state || null }),
+            ...(data.pincode !== undefined && { pincode: data.pincode || null }),
+        },
+    });
+};
+// Service to delete an area
+export const deleteAreaService = async (id) => {
+    return await prisma.area.delete({
+        where: { id },
+    });
+};

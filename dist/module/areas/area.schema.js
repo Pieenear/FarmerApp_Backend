@@ -6,3 +6,4 @@ export const createAreaSchema = z.object({
     state: z.string().max(150).optional().nullable(),
     pincode: z.string().regex(/^\d{6}$/, "Pincode must be exactly 6 digits").optional().nullable(),
 });
+export const updateAreaSchema = createAreaSchema.partial();
